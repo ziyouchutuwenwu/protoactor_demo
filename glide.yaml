@@ -1,0 +1,9 @@
+package: protoactor_demo
+import:
+- package: github.com/AsynkronIT/protoactor-go
+- package: github.com/AsynkronIT/goconsole
+- package: github.com/Workiva/go-datastructures
+- package: github.com/orcaman/concurrent-map
+- package: github.com/emirpasic/gods
+- package: google.golang.org/genproto
+- package: github.com/golang/protobuf
