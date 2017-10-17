@@ -5,7 +5,7 @@ import (
 
 	"github.com/AsynkronIT/goconsole"
 	"github.com/AsynkronIT/protoactor-go/actor"
-	"my_app/samples/messages"
+	"protoactor_demo/demo/messages"
 	"github.com/AsynkronIT/protoactor-go/remote"
 )
 

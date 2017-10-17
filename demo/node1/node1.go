@@ -5,7 +5,7 @@ import (
 	"time"
 
 	console "github.com/AsynkronIT/goconsole"
-	"my_app/samples/messages"
+	"protoactor_demo/demo/messages"
 	"github.com/AsynkronIT/protoactor-go/remote"
 )
 
