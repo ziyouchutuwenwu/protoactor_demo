@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-func newEndpointWriter(address string, config *remoteConfig) actor.Producer {
+func endpointWriterProducer(address string, config *remoteConfig) actor.Producer {
 	return func() actor.Actor {
 		return &endpointWriter{
 			address: address,
@@ -31,8 +31,8 @@ func (state *endpointWriter) initialize() {
 	err := state.initializeInternal()
 	if err != nil {
 		plog.Error("EndpointWriter failed to connect", log.String("address", state.address), log.Error(err))
-		//Wait 2 seconds to restart and retry
-		//Replace with Exponential Backoff
+		// Wait 2 seconds to restart and retry
+		// Replace with Exponential Backoff
 		time.Sleep(2 * time.Second)
 		panic(err)
 	}
@@ -61,9 +61,9 @@ func (state *endpointWriter) initializeInternal() error {
 	go func() {
 		_, err := stream.Recv()
 		if err != nil {
-			plog.Info("EndpointWriter lost connection to address", log.String("address", state.address))
+			plog.Info("EndpointWriter lost connection to address", log.String("address", state.address), log.Error(err))
 
-			//notify that the endpoint terminated
+			// notify that the endpoint terminated
 			terminated := &EndpointTerminatedEvent{
 				Address: state.address,
 			}
@@ -81,15 +81,23 @@ func (state *endpointWriter) initializeInternal() error {
 func (state *endpointWriter) sendEnvelopes(msg []interface{}, ctx actor.Context) {
 	envelopes := make([]*MessageEnvelope, len(msg))
 
-	//type name uniqueness map name string to type index
+	// type name uniqueness map name string to type index
 	typeNames := make(map[string]int32)
 	typeNamesArr := make([]string, 0)
 	targetNames := make(map[string]int32)
 	targetNamesArr := make([]string, 0)
+	var header *MessageHeader
 	var typeID int32
 	var targetID int32
 	var serializerID int32
 	for i, tmp := range msg {
+
+		switch unwrapped := tmp.(type) {
+		case *EndpointTerminatedEvent, EndpointTerminatedEvent:
+			plog.Debug("Handling array wrapped terminate event", log.String("address", state.address), log.Object("msg", unwrapped))
+			ctx.Stop(ctx.Self())
+			return
+		}
 		rd := tmp.(*remoteDeliver)
 
 		if rd.serializerID == -1 {
@@ -97,6 +105,13 @@ func (state *endpointWriter) sendEnvelopes(msg []interface{}, ctx actor.Context)
 		} else {
 			serializerID = rd.serializerID
 		}
+
+		if rd.header == nil || rd.header.Length() == 0 {
+			header = nil
+		} else {
+			header = &MessageHeader{rd.header.ToMap()}
+		}
+
 		bytes, typeName, err := Serialize(rd.message, serializerID)
 		if err != nil {
 			panic(err)
@@ -105,11 +120,12 @@ func (state *endpointWriter) sendEnvelopes(msg []interface{}, ctx actor.Context)
 		targetID, targetNamesArr = addToLookup(targetNames, rd.target.Id, targetNamesArr)
 
 		envelopes[i] = &MessageEnvelope{
-			MessageData:  bytes,
-			Sender:       rd.sender,
-			Target:       targetID,
-			TypeId:       typeID,
-			SerializerId: serializerID,
+			MessageHeader: header,
+			MessageData:   bytes,
+			Sender:        rd.sender,
+			Target:        targetID,
+			TypeId:        typeID,
+			SerializerId:  serializerID,
 		}
 	}
 
@@ -122,7 +138,7 @@ func (state *endpointWriter) sendEnvelopes(msg []interface{}, ctx actor.Context)
 
 	if err != nil {
 		ctx.Stash()
-		plog.Debug("gRPC Failed to send", log.String("address", state.address))
+		plog.Debug("gRPC Failed to send", log.String("address", state.address), log.Error(err))
 		panic("restart it")
 	}
 }
@@ -146,11 +162,13 @@ func (state *endpointWriter) Receive(ctx actor.Context) {
 		state.conn.Close()
 	case *actor.Restarting:
 		state.conn.Close()
+	case *EndpointTerminatedEvent:
+		ctx.Stop(ctx.Self())
 	case []interface{}:
 		state.sendEnvelopes(msg, ctx)
-	case actor.SystemMessage:
-		//ignore
+	case actor.SystemMessage, actor.AutoReceiveMessage:
+		// ignore
 	default:
-		plog.Error("EndpointWriter received unknown message", log.String("address", state.address), log.Message(msg))
+		plog.Error("EndpointWriter received unknown message", log.String("address", state.address), log.TypeOf("type", msg), log.Message(msg))
 	}
 }

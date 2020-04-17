@@ -25,44 +25,42 @@ func (strategy *oneForOne) HandleFailure(supervisor Supervisor, child *PID, rs *
 
 	switch directive {
 	case ResumeDirective:
-		//resume the failing child
+		// resume the failing child
 		logFailure(child, reason, directive)
 		supervisor.ResumeChildren(child)
 	case RestartDirective:
-		//try restart the failing child
-		if strategy.requestRestartPermission(rs) {
-			logFailure(child, reason, RestartDirective)
-			supervisor.RestartChildren(child)
-		} else {
+		// try restart the failing child
+		if strategy.shouldStop(rs) {
 			logFailure(child, reason, StopDirective)
 			supervisor.StopChildren(child)
+		} else {
+			logFailure(child, reason, RestartDirective)
+			supervisor.RestartChildren(child)
 		}
 	case StopDirective:
-		//stop the failing child, no need to involve the crs
+		// stop the failing child, no need to involve the crs
 		logFailure(child, reason, directive)
 		supervisor.StopChildren(child)
 	case EscalateDirective:
-		//send failure to parent
-		//supervisor mailbox
-		//do not log here, log in the parent handling the error
+		// send failure to parent
+		// supervisor mailbox
+		// do not log here, log in the parent handling the error
 		supervisor.EscalateFailure(reason, message)
 	}
 }
 
-func (strategy *oneForOne) requestRestartPermission(rs *RestartStatistics) bool {
-
-	//supervisor says this child may not restart
+func (strategy *oneForOne) shouldStop(rs *RestartStatistics) bool {
+	// supervisor says this child may not restart
 	if strategy.maxNrOfRetries == 0 {
-		return false
+		return true
 	}
 
 	rs.Fail()
 
-	if strategy.withinDuration == 0 || rs.IsWithinDuration(strategy.withinDuration) {
-		return rs.FailureCount <= strategy.maxNrOfRetries
+	if rs.NumberOfFailures(strategy.withinDuration) > strategy.maxNrOfRetries {
+		rs.Reset()
+		return true
 	}
 
-	//we are past the time limit, we can safely reset the failure count and restart
-	rs.Reset()
-	return true
+	return false
 }

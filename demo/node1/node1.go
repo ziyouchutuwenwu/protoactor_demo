@@ -3,7 +3,6 @@ package node1
 import (
 	"fmt"
 	"time"
-
 	console "github.com/AsynkronIT/goconsole"
 	"protoactor_demo/demo/messages"
 	"github.com/AsynkronIT/protoactor-go/remote"

@@ -18,4 +18,8 @@ func (f ActorFunc) Receive(c Context) {
 	f(c)
 }
 
-type SenderFunc func(c Context, target *PID, envelope *MessageEnvelope)
+type ReceiverFunc func(c ReceiverContext, envelope *MessageEnvelope)
+
+type SenderFunc func(c SenderContext, target *PID, envelope *MessageEnvelope)
+
+type ContextDecoratorFunc func(ctx Context) Context
