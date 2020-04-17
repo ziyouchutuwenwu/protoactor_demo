@@ -12,7 +12,7 @@ sudo apt install golang-goprotobuf-dev
 ### 安装protoc-gen-gogoslick
 - 到`https://github.com/gogo/protobuf` 的 `protoc-gen-gogoslick` 目录
 ```bash
-export export GO111MODULE=off; go build
+export GO111MODULE=off; go build
 ```
 
 ## vendor目录说明
